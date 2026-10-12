@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Estoque Lá Mison</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#111827;--mut:#6b7280;--bd:#e5e7eb;--ac:#0b7a75;--ok:#1a8f4c;--bad:#d23b3b;--warn:#c77a05}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1316;--card:#1a1f24;--tx:#eef1f5;--mut:#98a2b3;--bd:#2c3339;--ac:#12a39b;--ok:#3fcf7d;--bad:#ff6b6b;--warn:#f0a93b}}
+:root[data-theme="dark"]{--bg:#0f1316;--card:#1a1f24;--tx:#eef1f5;--mut:#98a2b3;--bd:#2c3339;--ac:#12a39b;--ok:#3fcf7d;--bad:#ff6b6b;--warn:#f0a93b}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#lo{display:none;position:absolute;right:14px;top:14px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:10px;padding:8px 12px;font-size:14px}
+.ro [data-act="mov"],.ro [data-act="ped"],.ro [data-act="done"],.ro [data-act="addp"],.ro [data-act="preset"],.ro [data-mv],.ro [data-act="rel"],.ro .rw:has(#np),.ro .lot:has(#mn){display:none!important}
+header{position:relative;background:#0b7a75;color:#fff;padding:22px 18px 26px}header h1{margin:0;font-size:30px;font-weight:800}header div{opacity:.92;font-size:19px;margin-top:6px;line-height:1.3}
+main{max-width:900px;margin:0 auto;padding:16px}
+.kp{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}.kp>div,.card{background:var(--card);border:1px solid var(--bd);border-radius:20px;padding:18px}
+.kp span,.u,.h{color:var(--mut);font-size:14px}.kp span{font-size:16px;font-weight:600}.kp b{display:block;font-size:46px;font-weight:800;margin-top:14px}
+.card{margin-bottom:14px}.row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}.row h2{margin:0;font-size:25px;font-weight:800}
+.pri{background:var(--ac);color:#fff;border:0;border-radius:12px;padding:13px 16px;font-size:18px;font-weight:800}
+.btn{padding:11px 16px;border-radius:12px;border:1px solid var(--bd);background:var(--card);color:#1f6fe0;font-size:17px;font-weight:700}.btn.out{color:var(--bad);border-color:var(--bad)}.btn.in{color:var(--ok);border-color:var(--ok)}.sm{padding:5px 10px;font-size:13px}
+input,select{padding:12px;border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);font-size:17px;margin-bottom:10px;width:100%}select{color:#1f6fe0}
+#fs{width:64%}#ff{width:46%;display:block;padding:8px 12px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:560px}th{font-size:14px;color:var(--mut);text-align:left;text-transform:uppercase;letter-spacing:.04em;padding:10px 8px;border-bottom:1px solid var(--bd);white-space:nowrap}
+td{padding:18px 8px;border-bottom:1px solid var(--bd);font-size:19px}tr[data-row]{cursor:pointer}#ht{min-width:760px}#ht td{font-size:16px;white-space:nowrap}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.fefo{font-size:12px;color:var(--ac);font-weight:700}
+.alert{border:1px solid var(--warn);border-radius:14px;padding:10px 12px;margin-bottom:14px;font-size:14px;background:var(--card)}
+.lot{border-top:1px solid var(--bd);padding-top:10px;margin-top:10px}.rw{display:flex;gap:8px}.rw>*{flex:1}.rw.r{justify-content:flex-end}.rw.r>*{flex:none}
+#sheet{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9;padding:16px}#sheet.show{display:flex}
+#sbody{background:var(--card);width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:24px;padding:22px}
+#sbody h3{margin:0 0 14px;font-size:28px;font-weight:800}label{font-size:16px;font-weight:800;display:block;margin:4px 0 6px}.err{color:var(--bad);font-size:14px;min-height:18px}
+</style></head><body>
+<header><button id="lo" data-act="logout">Sair</button><h1>📦 Estoque Lá Mison</h1><div>Controle de estoque e movimentações por lote</div></header>
+<main id="app"></main>
+<div id="sheet"><div id="sbody"></div></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,doc,setDoc,getDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {firebaseConfig} from "./config.js";
+const app=initializeApp(firebaseConfig),auth=getAuth(app),fdb=getFirestore(app);
+const dbr0={collection:c=>({doc:id=>({set:d=>setDoc(doc(fdb,c,id),d)}),onSnapshot:(f,e)=>onSnapshot(collection(fdb,c),f,e)})};
+let db=true,dbr=null,uid='',myName='',P=[],M=[],O=[],names={},sh=null,q='',flt='',hq='',onlyOut=false;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PRESET=[["Pastelzinho Carne 190",100],["Pastelzinho Carne 450",50],["Pastelzinho Queijo 190",70],["Pastelzinho Queijo 450",40],["Poptisco Queijo 190",50],["Poptisco Queijo 450",30],["Poptisco Carne 190",50],["Poptisco Carne 450",30],["Coxinha Tradicional 190",80],["Coxinha Tradicional 300",60],["Coxinha Tradicional 800",30]];
+const lim=m=>{const d=new Date(m+'T12:00:00');d.setDate(d.getDate()+60);return d};
+const dl=m=>{if(!m)return null;const t=new Date();t.setHours(12,0,0,0);return Math.round((lim(m)-t)/864e5)};
+const fd=s=>s?s.split('-').reverse().join('/'):'—',fl=m=>m?lim(m).toLocaleDateString('pt-BR'):'—';
+const fm=t=>new Date(t).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+const ST=d=>d==null?['⚪','Sem data','','Normal']:d<0?['⛔','Passou dos 60 dias','bad','Vencido']:d<=7?['🔴','Urgente','bad','Urgente']:d<=15?['🟠','Prioridade de venda','warn','Prioridade']:d<=30?['🟡','Atenção','warn','Atenção']:['🟢','Normal','ok','Normal'];
+const pname=id=>(P.find(p=>p.id===id)||{}).name||'(removido)';
+const total=pid=>M.filter(x=>x.product===pid).reduce((a,x)=>a+x.delta,0);
+function lots(pid){const m={};M.filter(x=>x.product===pid).forEach(x=>{const k=x.lot||'SEM LOTE',o=m[k]||(m[k]={lot:k,qty:0});o.qty+=x.delta;if(x.mfg){o.mfg=x.mfg;o.exp=x.exp}});
+ return Object.values(m).sort((a,b)=>(a.mfg?lim(a.mfg).getTime():9e15)-(b.mfg?lim(b.mfg).getTime():9e15))}
+function info(x){const act=lots(x.id).filter(l=>l.qty>0),tot=total(x.id),ds=act.map(l=>dl(l.mfg)).filter(d=>d!=null),d=ds.length?Math.min(...ds):null,mn=x.min||0,low=mn>0&&tot<mn;
+ const crit=low||tot<=0,st=crit?['🔴','Crítico','bad','Crítico']:ST(d),k=crit||(d!=null&&d<=7)?'critico':(d!=null&&d<=30)?'atencao':'normal';return{act,tot,d,mn,low,st,k}}
+const gid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+async function mut(fn){const st={p:P.map(x=>({...x})),m:M.slice(),o:O.map(x=>({...x}))},b={p:new Set(P.map(x=>x.id)),m:new Set(M.map(x=>x.id)),o:new Set(O.map(x=>x.id))},w=[];
+ fn(st);[['p','products',P],['m','movements',M],['o','orders',O]].forEach(([k,c,old])=>st[k].forEach(x=>{const {id,...d}=x;
+  if(!b[k].has(id))w.push(dbr.collection(c).doc(id).set(d));
+  else if(k!=='m'&&JSON.stringify(old.find(y=>y.id===id))!==JSON.stringify(x))w.push(dbr.collection(c).doc(id).set(d))}));
+ await Promise.all(w)}
+let unsub=[];
+function loginView(msg){$('#lo').style.display='none';$('#app').innerHTML=`<div class="card"><h2 style="margin:0 0 12px;font-size:25px">Entrar</h2><input id="em" type="email" placeholder="E-mail" autocomplete="username"><input id="pw" type="password" placeholder="Senha" autocomplete="current-password"><div class="err" id="le">${esc(msg||'')}</div><button class="pri" style="width:100%" data-act="login">Entrar</button></div>`}
+async function login(){const em=$('#em').value.trim(),pw=$('#pw').value;if(!em||!pw)return $('#le').textContent='Informe e-mail e senha';
+ try{await signInWithEmailAndPassword(auth,em,pw)}catch(e){$('#le').textContent='E-mail ou senha incorretos'}}
+function init(){
+ onAuthStateChanged(auth,async u=>{unsub.forEach(f=>f());unsub=[];P=[];M=[];O=[];dbr=null;
+  if(!u){uid='';return loginView()}
+  uid=u.uid;let role='',nm='';
+  try{const r=await getDoc(doc(fdb,'users',u.uid));if(r.exists()){role=r.data().role;nm=r.data().name||''}}catch(e){}
+  $('#lo').style.display='block';
+  if(role!=='editor'&&role!=='viewer'){document.body.classList.add('ro');$('#app').innerHTML='<div class="card">Seu usuário ainda não foi liberado. Peça ao administrador para cadastrar a sua permissão.</div>';return}
+  document.body.classList.toggle('ro',role==='viewer');myName=nm||(u.email||'').split('@')[0];dbr=dbr0;
+  const err=e=>{$('#app').innerHTML='<div class="card">Erro de acesso: '+esc(e.code||e.message)+'</div>'};
+  unsub.push(dbr.collection("products").onSnapshot(s=>{P=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.name.localeCompare(b.name));render()},err));
+  unsub.push(dbr.collection("movements").onSnapshot(s=>{M=s.docs.map(d=>({id:d.id,...d.data()}));render()},err));
+  unsub.push(dbr.collection("orders").onSnapshot(s=>{O=s.docs.map(d=>({id:d.id,...d.data()}));render()},err));
+ });}
+function render(){
+ if(!db)return;const I=P.map(x=>({x,i:info(x)})),pend={};O.filter(o=>o.status!=='feito').forEach(o=>pend[o.product]=(pend[o.product]||0)+o.qty);
+ const falta=P.filter(x=>(pend[x.id]||0)>total(x.id)),ao=document.activeElement&&document.activeElement.id;
+ $('#app').innerHTML=`<div class="kp"><div><span>Itens cadastrados</span><b>${P.length}</b></div><div><span>Unidades em estoque</span><b>${I.reduce((a,r)=>a+Math.max(r.i.tot,0),0)}</b></div><div><span>Atenção</span><b>${I.filter(r=>r.i.k!=='normal').length}</b></div><div><span>Movimentações</span><b>${M.length}</b></div></div>`
+ +(falta.length?'<div class="alert"><b>Para embalar (pedidos acima do estoque):</b><br>'+falta.map(x=>esc(x.name)+': faltam <b>'+((pend[x.id]||0)-total(x.id))+'</b> un.').join('<br>')+'</div>':'')
+ +`<div class="card"><div class="row"><h2>Estoque atual</h2><button class="pri" data-act="mov">+ Movimentação</button></div><input id="fs" placeholder="🔎 Buscar produto..." value="${esc(q)}"><select id="ff"><option value="">Todos</option><option value="normal" ${flt=='normal'?'selected':''}>Normal</option><option value="atencao" ${flt=='atencao'?'selected':''}>Atenção</option><option value="critico" ${flt=='critico'?'selected':''}>Crítico</option></select><div class="tw"><table><thead><tr><th>Produto</th><th>Estoque</th><th>Mínimo</th><th>Status</th></tr></thead><tbody id="tb">${rows(I)}</tbody></table></div><div class="rw" style="margin-top:12px"><input id="np" placeholder="Novo produto"><button class="btn" style="flex:none;margin-bottom:10px" data-act="addp">Adicionar</button></div><button class="btn sm" data-act="preset">Carregar lista padrão de produtos</button></div>`
+ +`<div class="card"><div class="row"><h2>Histórico recente</h2><span class="h">últimas movimentações</span></div><input id="hs" placeholder="🔎 Buscar por lote, cliente ou produto" value="${esc(hq)}"><button class="btn ${onlyOut?'in':''}" style="margin-bottom:10px" data-act="only">${onlyOut?'Mostrando só saídas':'Mostrar só saídas'}</button><div class="tw"><table id="ht"><thead><tr><th>Data/hora</th><th>Produto</th><th>Tipo</th><th>Qtd.</th><th>Respon.</th><th>Lote</th><th>Cliente</th></tr></thead><tbody id="hl">${histRows()}</tbody></table></div></div>`
+ +`<div class="card"><div class="row"><h2>Pedidos</h2><button class="btn" data-act="ped">+ Pedido</button></div>${O.filter(o=>o.status!=='feito').sort((a,b)=>a.ts-b.ts).map(o=>`<div class="row" style="border-top:1px solid var(--bd);padding-top:8px;margin:8px 0 0"><div><b>${esc(pname(o.product))}</b><div class="u">${o.qty} un.${o.who?' · '+esc(o.who):''} · ${fm(o.ts)}</div></div><button class="btn in sm" data-act="done" data-id="${o.id}">Concluir</button></div>`).join('')||'<div class="u">Nenhum pedido pendente.</div>'}</div>`
+ +`<div class="card"><div class="row"><h2>Copiar para Excel</h2></div><div class="rw"><button class="btn" data-act="exp-est">Estoque por lote</button><button class="btn" data-act="exp-his">Histórico completo</button></div></div>`;
+ if(ao==='fs'||ao==='hs'){const e=$('#'+ao),v=ao==='fs'?q:hq;e.focus();e.setSelectionRange(v.length,v.length)}
+}
+function rows(I){const t=q.toLowerCase();
+ const r=I.filter(({x,i})=>(!t||x.name.toLowerCase().includes(t))&&(!flt||i.k===flt));
+ return r.map(({x,i})=>`<tr data-row="${x.id}"><td>${esc(x.name)}</td><td><b>${i.tot}</b></td><td>${i.mn||'—'}</td><td class="${i.st[2]}"><b>${i.st[0]} ${i.st[3]}</b></td></tr>`).join('')||'<tr><td colspan="4" class="u">Nenhum produto.</td></tr>'}
+function histRows(){const t=hq.toLowerCase(),T={in:'Entrada',out:'Saída',adj:'Ajuste',lote:'Lote informado'};
+ return M.filter(m=>(!onlyOut||m.delta<0)&&(!t||[pname(m.product),m.lot,m.client].join(' ').toLowerCase().includes(t))).sort((a,b)=>b.ts-a.ts).slice(0,80).map(m=>`<tr><td>${fm(m.ts)}</td><td>${esc(pname(m.product))}</td><td>${T[m.kind]||'—'}</td><td class="${m.delta<0?'bad':'ok'}"><b>${m.delta>0?'+':''}${m.delta}</b></td><td>${esc(m.resp||names[m.by]||'')}</td><td>${esc(m.lot||'—')}</td><td>${esc(m.client||'—')}</td></tr>`).join('')||'<tr><td colspan="7" class="u" style="font-size:19px;padding:18px 8px">Nenhuma movimentação registrada.</td></tr>'}
+const show=h=>{$('#sbody').innerHTML=h;$('#sheet').classList.add('show')},closeSheet=()=>{$('#sheet').classList.remove('show');sh=null};
+function openDet(id){const x=P.find(p=>p.id===id),i=info(x);sh={id};
+ show(`<h3>${esc(x.name)}</h3><div class="u">Total: <b>${i.tot}</b> un. · ${i.st[0]} ${i.st[1]}</div>`+(i.act.map((l,n)=>{const d=dl(l.mfg),s=ST(d);return `<div class="lot"><div class="row" style="margin:0"><div><b>Lote ${esc(l.lot)}</b> ${n==0&&i.act.length>1?'<span class="fefo">FEFO · sai primeiro</span>':''}<div class="u">Fab ${fd(l.mfg)} · Val ${fd(l.exp)} · Limite ${fl(l.mfg)}</div><div class="${s[2]}" style="font-size:14px">${s[0]} ${s[1]}${d!=null?' · '+(d<0?Math.abs(d)+' dias além':d+' dias restantes'):''}</div></div><div style="text-align:right"><div style="font-size:22px;font-weight:700">${l.qty}</div><button class="btn sm" data-mv="adj" data-lot="${esc(l.lot)}">Ajustar</button>${l.lot==='SEM LOTE'?'<br><button class="btn sm in" style="margin-top:6px" data-act="rel">Informar lote</button>':''}</div></div></div>`}).join('')||'<div class="lot u">Sem lotes com saldo.</div>')
+ +`<div class="lot"><label>Estoque mínimo</label><div class="rw"><input id="mn" type="number" inputmode="numeric" min="0" value="${x.min||''}"><button class="btn" style="margin-bottom:10px" data-act="savemin">Salvar</button></div></div><div class="rw"><button class="btn out" data-mv="out">− Saída</button><button class="btn in" data-mv="in">+ Entrada</button></div><button class="btn" style="width:100%;margin-top:10px" data-act="close">Fechar</button>`)}
+function openMov(id,mode,lot){sh={id:id||(P[0]||{}).id,mode:mode||'in',lot};renderMov()}
+function renderMov(){const L=lots(sh.id),act=L.filter(l=>l.qty>0),mode=sh.mode;
+ const opts=(mode==='out'?act:L).map(l=>`<option value="${esc(l.lot)}" ${l.lot===sh.lot?'selected':''}>${esc(l.lot)} · saldo ${l.qty} · limite ${fl(l.mfg)}</option>`).join('');
+ const cl=[...new Set(M.map(m=>m.client).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');let f='';
+ if(mode==='in')f=`<label>Lote</label><input id="lt" placeholder="Ex.: LC081026" style="text-transform:uppercase"><div class="rw"><div><label>Fabricação</label><input id="mf" type="date"></div><div><label>Validade</label><input id="ex" type="date"></div></div><div class="u" id="lm" style="margin-bottom:10px">Limite de venda = fabricação + 60 dias</div><label>Quantidade</label><input id="q" type="number" inputmode="numeric" min="1" placeholder="Ex.: 30">`;
+ else if(!opts)f='<div class="u" style="margin:8px 0">Nenhum lote com saldo. Registre uma entrada primeiro.</div>';
+ else f=`<label>Lote (FEFO: o primeiro sai antes)</label><select id="ls">${opts}</select>`+(mode==='out'?`<label>Cliente</label><input id="cl" list="cls" placeholder="Nome do cliente"><datalist id="cls">${cl}</datalist><label>Quantidade</label><input id="q" type="number" inputmode="numeric" min="1" placeholder="Ex.: 30">`:`<label>Contagem real do lote</label><input id="q" type="number" inputmode="numeric" min="0">`);
+ show(`<h3>Registrar movimentação</h3><label>Produto</label><select id="sp">${P.map(p=>`<option value="${p.id}" ${p.id===sh.id?'selected':''}>${esc(p.name)} — ${total(p.id)} un.</option>`).join('')}</select><label>Tipo</label><select id="sm"><option value="in" ${mode=='in'?'selected':''}>Entrada (+)</option><option value="out" ${mode=='out'?'selected':''}>Saída (−)</option><option value="adj" ${mode=='adj'?'selected':''}>Ajuste de contagem</option></select>${f}<label>Responsável</label><input id="rp" placeholder="Nome" value="${esc(sh.resp||myName)}"><div class="err" id="er"></div><div class="rw r"><button class="btn" data-act="close">Cancelar</button><button class="pri" data-act="save">Confirmar</button></div>`)}
+function openRel(){const l=lots(sh.id).find(x=>x.lot==='SEM LOTE'),n=l?l.qty:0;sh={id:sh.id,rel:1,max:n};
+ show(`<h3>Informar lote</h3><div class="u" style="margin-bottom:10px">${esc(pname(sh.id))} · ${n} un. sem lote. O saldo sai de "SEM LOTE" e vai para o lote informado, sem alterar o total.</div><label>Lote</label><input id="lt" placeholder="Ex.: LC081026" style="text-transform:uppercase"><div class="rw"><div><label>Fabricação</label><input id="mf" type="date"></div><div><label>Validade</label><input id="ex" type="date"></div></div><label>Quantidade a mover</label><input id="q" type="number" inputmode="numeric" min="1" max="${n}" value="${n}"><label>Responsável</label><input id="rp" value="${esc(myName)}" placeholder="Nome"><div class="err" id="er"></div><div class="rw r"><button class="btn" data-act="close">Cancelar</button><button class="pri" data-act="saverel">Confirmar</button></div>`)}
+async function saveRel(){
+ const er=m=>$('#er').textContent=m,lot=$('#lt').value.trim().toUpperCase(),mf=$('#mf').value,ex=$('#ex').value,v=parseInt($('#q').value,10),rp=$('#rp').value.trim();
+ if(!lot||lot==='SEM LOTE'||!mf||!ex)return er('Informe lote, fabricação e validade');if(ex<mf)return er('Validade antes da fabricação');if(!rp)return er('Informe o responsável');if(!(v>0)||v>sh.max)return er('Quantidade entre 1 e '+sh.max);
+ const b={product:sh.id,resp:rp.slice(0,60),by:uid,ts:Date.now(),kind:'lote'};
+ try{await mut(st=>{st.m.push({id:gid(),...b,lot,mfg:mf,exp:ex,delta:v});st.m.push({id:gid(),...b,lot:'SEM LOTE',delta:-v})});closeSheet()}catch(e){er('Não foi possível salvar: '+(e.code||e.message))}
+}
+function openPed(){sh={ped:1};show(`<h3>Novo pedido</h3><label>Produto</label><select id="op">${P.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select><label>Quantidade</label><input id="oq" type="number" inputmode="numeric" min="1"><label>Pedido de (cliente/evento)</label><input id="ow"><div class="rw r"><button class="btn" data-act="close">Cancelar</button><button class="pri" data-act="addo">Registrar</button></div>`)}
+async function save(){
+ const er=m=>$('#er').textContent=m,qe=$('#q'),v=qe?parseInt(qe.value,10):NaN,rp=$('#rp').value.trim();
+ if(!rp)return er('Informe o responsável');const base={product:sh.id,resp:rp.slice(0,60),by:uid,ts:Date.now()};let rec;
+ if(sh.mode==='in'){const lot=$('#lt').value.trim().toUpperCase(),mf=$('#mf').value,ex=$('#ex').value;
+  if(!lot||!mf||!ex)return er('Informe lote, fabricação e validade');if(ex<mf)return er('Validade antes da fabricação');if(!(v>0))return er('Informe a quantidade');
+  rec={...base,kind:'in',lot,mfg:mf,exp:ex,delta:v}}
+ else{const ls=$('#ls');if(!ls||!ls.value)return er('Selecione o lote');const L=lots(sh.id),cur=(L.find(l=>l.lot===ls.value)||{}).qty||0;
+  if(sh.mode==='out'){const cl=$('#cl').value.trim();if(!cl)return er('Informe o cliente: saída sem cliente não é permitida');if(!(v>0))return er('Informe a quantidade');if(v>cur)return er('O lote só tem '+cur+' un.');
+   const f=L.find(l=>l.qty>0);if(f&&f.lot!==ls.value&&!sh.warned){sh.warned=true;return er('FEFO: o lote '+f.lot+' vence antes. Toque em Confirmar de novo para sair com este mesmo.')}
+   rec={...base,kind:'out',lot:ls.value,client:cl.slice(0,80),delta:-v}}
+  else{if(isNaN(v)||v<0)return er('Informe a contagem');if(v===cur)return closeSheet();rec={...base,kind:'adj',lot:ls.value,delta:v-cur}}}
+ try{try{localStorage.setItem('nome',rp)}catch(x){}myName=rp;await mut(st=>st.m.push({id:gid(),...rec}));closeSheet()}catch(e){er('Não foi possível salvar: '+(e.code||e.message))}
+}
+const csv=r=>r.map(a=>a.map(v=>String(v==null?'':v).replace(/[\t\r\n]+/g,' ')).join('\t')).join('\n');
+async function exp(k){const msg=t=>{const e=$('#xm');if(e)e.textContent=t};let r,n;
+ if(k==='est'){n='estoque-por-lote';r=[['Produto','Lote','Saldo','Fabricação','Validade','Limite de venda','Dias restantes','Status','Mínimo do produto']];
+  P.forEach(x=>{const L=lots(x.id).filter(l=>l.qty!==0);if(!L.length)r.push([x.name,'',0,'','','','','',x.min||'']);L.forEach(l=>{const d=dl(l.mfg);r.push([x.name,l.lot,l.qty,fd(l.mfg),fd(l.exp),fl(l.mfg),d==null?'':d,ST(d)[1],x.min||''])})})}
+ else{n='historico-movimentacoes';const T={in:'Entrada',out:'Saída',adj:'Ajuste',lote:'Lote informado'};r=[['Data/hora','Produto','Tipo','Quantidade','Responsável','Lote','Cliente','Fabricação','Validade','Observação']];
+  M.slice().sort((a,b)=>b.ts-a.ts).forEach(m=>r.push([new Date(m.ts).toLocaleString('pt-BR'),pname(m.product),T[m.kind]||'',m.delta,m.resp||names[m.by]||'',m.lot||'',m.client||'',fd(m.mfg),fd(m.exp),m.note||'']))}
+ const t=csv(r);show(`<h3>${n==='estoque-por-lote'?'Estoque por lote':'Histórico completo'}</h3><div class="u" style="margin-bottom:10px">Toque em Copiar, abra o Excel (ou Planilhas) e cole na célula A1.</div><textarea id="xt" readonly style="width:100%;height:180px;font-size:13px;border:1px solid var(--bd);border-radius:12px;padding:10px;background:var(--bg);color:var(--tx)">${esc(t)}</textarea><div class="rw r" style="margin-top:10px"><button class="btn" data-act="close">Fechar</button><button class="pri" data-act="copy">Copiar</button></div>`)
+}
+document.addEventListener('input',e=>{const i=e.target.id;
+ if(i==='fs'){q=e.target.value;$('#tb').innerHTML=rows(P.map(x=>({x,i:info(x)})))}
+ else if(i==='hs'){hq=e.target.value;$('#hl').innerHTML=histRows()}
+ else if(i==='mf'&&$('#lm'))$('#lm').textContent=e.target.value?'Limite de venda (fab + 60 dias): '+fl(e.target.value):'Limite de venda = fabricação + 60 dias';
+});
+document.addEventListener('change',e=>{const i=e.target.id;
+ if(i==='ff'){flt=e.target.value;$('#tb').innerHTML=rows(P.map(x=>({x,i:info(x)})))}
+ else if(i==='sp'||i==='sm'){const r=$('#rp');sh.resp=r?r.value:'';if(i==='sp')sh.id=e.target.value;else sh.mode=e.target.value;sh.lot=null;sh.warned=false;renderMov()}
+});
+document.addEventListener('click',async e=>{
+ if(e.target.id==='sheet')return closeSheet();
+ const b=e.target.closest('button'),r=e.target.closest('[data-row]');
+ if(!b){if(r&&db)openDet(r.dataset.row);return}const d=b.dataset;
+ if(d.mv)openMov(sh.id,d.mv,d.lot);
+ else if(d.act==='mov')openMov(P[0]&&P[0].id,'in');
+ else if(d.act==='ped')openPed();
+ else if(d.act==='login')login();else if(d.act==='logout')signOut(auth);
+ else if(d.act==='copy'){const x=$('#xt');try{await navigator.clipboard.writeText(x.value);b.textContent='Copiado ✓'}catch(er){x.select();document.execCommand&&document.execCommand('copy');b.textContent='Copiado ✓'}}
+ else if(d.act==='exp-est'||d.act==='exp-his')exp(d.act.slice(4));
+ else if(d.act==='rel')openRel();else if(d.act==='saverel')saveRel();
+ else if(d.act==='close')closeSheet();else if(d.act==='save')save();
+ else if(d.act==='only'){onlyOut=!onlyOut;render()}
+ else if(d.act==='savemin'){const n=parseInt($('#mn').value,10),pid=sh.id;await mut(st=>{const p=st.p.find(x=>x.id===pid);if(p)p.min=isNaN(n)?0:n});closeSheet()}
+ else if(d.act==='preset')await mut(st=>{PRESET.forEach(p=>{if(!st.p.some(x=>x.name===p[0]))st.p.push({id:gid(),name:p[0],min:p[1]})})})
+ else if(d.act==='addp'){const n=$('#np').value.trim();if(n)await mut(st=>st.p.push({id:gid(),name:n.slice(0,60)}))}
+ else if(d.act==='addo'){const n=parseInt($('#oq').value,10),p=$('#op').value;if(p&&n>0){const w=$('#ow').value.slice(0,60);await mut(st=>st.o.push({id:gid(),product:p,qty:n,who:w,status:'pendente',ts:Date.now()}));closeSheet()}}
+ else if(d.act==='done'){await mut(st=>{const o=st.o.find(x=>x.id===d.id);if(o)o.status='feito'})}
+});
+init();
+</script></body></html>
